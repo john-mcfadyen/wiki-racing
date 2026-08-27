@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,6 +12,7 @@ import { useGameStore } from '../store/gameStore';
 import { fetchArticleHtml } from '../services/wikipedia';
 import { ArticleWebView } from '../components/ArticleWebView';
 import { GameHeader } from '../components/GameHeader';
+import { C, F } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
@@ -54,14 +54,12 @@ export function GameScreen({ navigation, route: navRoute }: Props) {
     async (title: string) => {
       if (!race || race.status !== 'active') return;
 
-      // Check win condition
       const normalizedTarget = route.endTitle.toLowerCase().trim();
       const normalizedClicked = title.toLowerCase().trim();
 
       navigateTo(title);
 
       if (normalizedClicked === normalizedTarget) {
-        // Win!
         const result = completeRace();
         if (result) {
           navigation.replace('Result', { result });
@@ -75,15 +73,19 @@ export function GameScreen({ navigation, route: navRoute }: Props) {
   );
 
   function handleHint(hintType: string) {
-    let text = '';
-    if (hintType === 'category') {
-      text = `The target article "${route.endTitle}" is in the category: Notable ${route.difficulty === 'easy' ? 'animals' : route.difficulty === 'medium' ? 'historical topics' : 'scientific concepts'}.`;
-    } else if (hintType === 'waypoint') {
-      text = `Try navigating through a related topic to reach "${route.endTitle}".`;
-    } else {
-      text = `Navigate directly to "${route.endTitle}" from any article that links to it.`;
-    }
-    setHint({ type: hintType, text });
+    const hintMessages: Record<string, string> = {
+      category:
+        `"${route.endTitle}" falls in a broad ` +
+        (route.difficulty === 'easy'
+          ? 'animals & nature'
+          : route.difficulty === 'medium'
+          ? 'history & culture'
+          : 'science & technology') +
+        ' category.',
+      waypoint: `Try navigating through a major hub article on your way to "${route.endTitle}".`,
+      direct: `Look for an article that directly links to "${route.endTitle}".`,
+    };
+    setHint({ type: hintType, text: hintMessages[hintType] ?? '' });
   }
 
   function handleGiveUp() {
@@ -99,31 +101,36 @@ export function GameScreen({ navigation, route: navRoute }: Props) {
 
       {hint && (
         <View style={styles.hintBanner}>
-          <Text style={styles.hintTitle}>
-            Hint ({hint.type.charAt(0).toUpperCase() + hint.type.slice(1)})
-          </Text>
+          <View style={styles.hintBannerHeader}>
+            <Text style={styles.hintType}>
+              HINT · {hint.type.toUpperCase()}
+            </Text>
+            <TouchableOpacity onPress={() => setHint(null)}>
+              <Text style={styles.hintDismiss}>DISMISS</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.hintText}>{hint.text}</Text>
-          <TouchableOpacity onPress={() => setHint(null)} style={styles.hintClose}>
-            <Text style={styles.hintCloseText}>Dismiss</Text>
-          </TouchableOpacity>
         </View>
       )}
 
       {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#0066cc" />
-          <Text style={styles.loadingText}>Loading article...</Text>
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={C.accent} />
+          <Text style={styles.loadingText}>FETCHING ARTICLE...</Text>
         </View>
       )}
 
       {error && !loading && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.errorState}>
+          <Text style={styles.errorCode}>ERR_LOAD_FAILED</Text>
+          <Text style={styles.errorMsg}>{error}</Text>
           <TouchableOpacity
             style={styles.retryBtn}
-            onPress={() => loadArticle(race?.clickHistory.at(-1) ?? route.startTitle)}
+            onPress={() =>
+              loadArticle(race?.clickHistory.at(-1) ?? route.startTitle)
+            }
           >
-            <Text style={styles.retryBtnText}>Retry</Text>
+            <Text style={styles.retryBtnText}>RETRY</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -142,64 +149,83 @@ export function GameScreen({ navigation, route: navRoute }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: C.bg,
   },
-  loadingOverlay: {
+  loadingState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   loadingText: {
-    color: '#888',
-    fontSize: 14,
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.muted,
+    letterSpacing: 2,
   },
-  errorBox: {
+  errorState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-    gap: 16,
+    padding: 32,
+    gap: 12,
   },
-  errorText: {
-    color: '#cc3300',
-    fontSize: 14,
+  errorCode: {
+    fontFamily: F.monoBold,
+    fontSize: 12,
+    color: C.danger,
+    letterSpacing: 2,
+  },
+  errorMsg: {
+    fontFamily: F.mono,
+    fontSize: 13,
+    color: C.muted,
     textAlign: 'center',
   },
   retryBtn: {
-    backgroundColor: '#0066cc',
+    marginTop: 8,
     paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.accent,
+    backgroundColor: C.accentDim,
   },
   retryBtnText: {
-    color: '#fff',
-    fontWeight: '600',
+    fontFamily: F.mono,
+    fontSize: 11,
+    color: C.accent,
+    letterSpacing: 2,
   },
   hintBanner: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: C.elevated,
     borderBottomWidth: 1,
-    borderBottomColor: '#fde68a',
+    borderBottomColor: C.warning,
     padding: 12,
     paddingHorizontal: 16,
-    gap: 4,
+    gap: 6,
   },
-  hintTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#92400e',
-    textTransform: 'uppercase',
+  hintBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hintType: {
+    fontFamily: F.mono,
+    fontSize: 9,
+    color: C.warning,
+    letterSpacing: 2,
+  },
+  hintDismiss: {
+    fontFamily: F.mono,
+    fontSize: 9,
+    color: C.muted,
+    letterSpacing: 1,
   },
   hintText: {
-    fontSize: 14,
-    color: '#78350f',
-  },
-  hintClose: {
-    alignSelf: 'flex-end',
-  },
-  hintCloseText: {
+    fontFamily: F.mono,
     fontSize: 12,
-    color: '#92400e',
-    fontWeight: '600',
+    color: C.muted,
+    letterSpacing: 0.3,
   },
 });

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useGameStore } from '../store/gameStore';
+import { C, F } from '../theme';
 
 interface Props {
   onGiveUp: () => void;
@@ -28,17 +29,29 @@ export function GameHeader({ onGiveUp, onHint }: Props) {
   const secs = elapsed % 60;
   const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
 
+  const clicksOverPar = clicks - race.parClicks;
+  const clickColor =
+    clicks === 0
+      ? C.muted
+      : clicksOverPar < 0
+      ? C.easy
+      : clicksOverPar === 0
+      ? C.accent
+      : clicksOverPar <= 2
+      ? C.warning
+      : C.danger;
+
   function handleHint() {
     if (hintsLeft === 0) {
-      Alert.alert('No hints left', 'You can now give up if you want.', [
-        { text: 'Keep trying', style: 'cancel' },
-        { text: 'Give Up', style: 'destructive', onPress: onGiveUp },
+      Alert.alert('Out of hints', 'All hints used. Give up?', [
+        { text: 'Keep going', style: 'cancel' },
+        { text: 'Give Up (DNF)', style: 'destructive', onPress: onGiveUp },
       ]);
       return;
     }
     Alert.alert(
-      `Use hint? (${hintsLeft} left)`,
-      `+3 click penalty. You have ${hintsLeft} hint${hintsLeft !== 1 ? 's' : ''} remaining.`,
+      `Use hint? +3 click penalty`,
+      `${hintsLeft} hint${hintsLeft !== 1 ? 's' : ''} remaining after this.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -53,48 +66,75 @@ export function GameHeader({ onGiveUp, onHint }: Props) {
   }
 
   function handleGiveUp() {
-    if (hintsLeft > 0) {
-      Alert.alert('Give up?', 'Use all your hints first, or give up now for a DNF.', [
-        { text: 'Keep trying', style: 'cancel' },
-        { text: 'Give Up (DNF)', style: 'destructive', onPress: onGiveUp },
-      ]);
-    } else {
-      Alert.alert('Give up?', 'This will count as a DNF.', [
-        { text: 'Cancel', style: 'cancel' },
+    Alert.alert(
+      'Give up?',
+      hintsLeft > 0
+        ? 'This counts as DNF. You still have hints left!'
+        : 'This counts as a DNF.',
+      [
+        { text: 'Keep going', style: 'cancel' },
         { text: 'Give Up', style: 'destructive', onPress: onGiveUp },
-      ]);
-    }
+      ]
+    );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.target}>
-        <Text style={styles.targetLabel}>Find</Text>
+      {/* Target row */}
+      <View style={styles.targetRow}>
+        <View style={styles.targetPulse} />
+        <Text style={styles.targetLabel}>FIND</Text>
         <Text style={styles.targetTitle} numberOfLines={1}>
           {race.endArticle.title}
         </Text>
       </View>
-      <View style={styles.stats}>
-        <Stat label="Clicks" value={String(clicks)} />
-        <Stat label="Par" value={String(race.parClicks)} />
-        <Stat label="Time" value={timeStr} />
-      </View>
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.hintBtn} onPress={handleHint}>
-          <Text style={styles.hintBtnText}>Hint ({hintsLeft})</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.giveUpBtn} onPress={handleGiveUp}>
-          <Text style={styles.giveUpBtnText}>Give Up</Text>
-        </TouchableOpacity>
+
+      {/* Stats + actions */}
+      <View style={styles.bottomRow}>
+        <View style={styles.statsRow}>
+          <Stat label="CLICKS" value={String(clicks)} valueColor={clickColor} />
+          <View style={styles.statDivider} />
+          <Stat label="PAR" value={String(race.parClicks)} valueColor={C.muted} />
+          <View style={styles.statDivider} />
+          <Stat label="TIME" value={timeStr} valueColor={C.cyan} />
+        </View>
+
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[
+              styles.hintBtn,
+              hintsLeft === 0 && styles.hintBtnDisabled,
+            ]}
+            onPress={handleHint}
+          >
+            <Text style={[styles.hintBtnText, hintsLeft === 0 && styles.hintBtnTextDisabled]}>
+              HINT {hintsLeft > 0 ? `×${hintsLeft}` : '—'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.giveUpBtn} onPress={handleGiveUp}>
+            <Text style={styles.giveUpText}>✕</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
   return (
     <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={[styles.statValue, valueColor ? { color: valueColor } : {}]}>
+        {value}
+      </Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
@@ -102,74 +142,114 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e8e8e8',
+    borderBottomColor: C.border,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 10,
+    gap: 10,
   },
-  target: {
+  targetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  targetPulse: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.accent,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 5,
+    shadowOpacity: 1,
+  },
   targetLabel: {
-    fontSize: 12,
-    color: '#888',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontFamily: F.mono,
+    fontSize: 9,
+    color: C.muted,
+    letterSpacing: 2,
   },
   targetTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0066cc',
+    fontFamily: F.displayBold,
+    fontSize: 18,
+    color: C.accent,
     flex: 1,
+    letterSpacing: 0.5,
+    textShadowColor: C.accent,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
-  stats: {
+  bottomRow: {
     flexDirection: 'row',
-    gap: 24,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   stat: {
     alignItems: 'center',
+    gap: 1,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    fontFamily: F.monoBold,
+    fontSize: 18,
+    color: C.text,
   },
   statLabel: {
-    fontSize: 11,
-    color: '#888',
-    textTransform: 'uppercase',
+    fontFamily: F.mono,
+    fontSize: 8,
+    color: C.dim,
+    letterSpacing: 1.5,
   },
-  actions: {
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: C.border,
+  },
+  actionsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   hintBtn: {
-    flex: 1,
-    backgroundColor: '#f0f4ff',
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 6,
+    backgroundColor: C.accentDim,
+    borderWidth: 1,
+    borderColor: C.accent,
+  },
+  hintBtnDisabled: {
+    backgroundColor: 'transparent',
+    borderColor: C.dim,
   },
   hintBtnText: {
-    color: '#0066cc',
-    fontWeight: '600',
-    fontSize: 14,
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.accent,
+    letterSpacing: 1,
+  },
+  hintBtnTextDisabled: {
+    color: C.dim,
   },
   giveUpBtn: {
-    flex: 1,
-    backgroundColor: '#fff0f0',
-    borderRadius: 8,
-    paddingVertical: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: C.dangerDim,
+    borderWidth: 1,
+    borderColor: C.danger,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  giveUpBtnText: {
-    color: '#cc3300',
-    fontWeight: '600',
-    fontSize: 14,
+  giveUpText: {
+    fontFamily: F.monoBold,
+    fontSize: 12,
+    color: C.danger,
   },
 });

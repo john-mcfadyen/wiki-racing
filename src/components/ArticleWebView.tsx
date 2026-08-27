@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
-import { StyleSheet, ActivityIndicator, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
+import { C, F } from '../theme';
 
 interface Props {
   html: string;
@@ -9,37 +10,62 @@ interface Props {
 }
 
 const INJECTED_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+  html, body {
+    background-color: ${C.bg} !important;
+    margin: 0; padding: 0;
+  }
   body {
-    font-family: -apple-system, system-ui, sans-serif;
-    font-size: 16px;
-    line-height: 1.6;
-    color: #1a1a1a;
-    padding: 0 16px 40px;
-    margin: 0;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: ${C.text} !important;
+    padding: 0 18px 60px;
     max-width: 100%;
   }
-  a[href^="wiki://"] {
-    color: #0066cc;
-    text-decoration: none;
-    border-bottom: 1px solid #cce0ff;
+  * { background-color: transparent !important; color: ${C.text} !important; }
+  h1 { font-size: 22px; font-weight: 700; margin: 20px 0 10px; color: ${C.text} !important; }
+  h2 {
+    font-size: 17px; font-weight: 600; margin: 20px 0 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid ${C.border} !important;
+    color: ${C.text} !important;
   }
-  a[href^="wiki://"]:active {
-    background: #e8f0fe;
-  }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
-  td, th { padding: 4px 8px; border: 1px solid #ddd; }
+  h3 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; color: ${C.text} !important; }
   p { margin: 8px 0; }
-  h1, h2, h3 { font-weight: 600; margin: 16px 0 8px; }
-  h1 { font-size: 22px; }
-  h2 { font-size: 18px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
-  h3 { font-size: 16px; }
-  img { display: none; }
+  a[href^="wiki://"] {
+    color: ${C.accent} !important;
+    text-decoration: none !important;
+    border-bottom: 1px solid rgba(109,255,109,0.25) !important;
+  }
+  a[href^="wiki://"]:active { background-color: ${C.accentGlow} !important; border-radius: 2px; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    margin: 10px 0; border: 1px solid ${C.border} !important;
+  }
+  td, th {
+    padding: 6px 10px;
+    border: 1px solid ${C.border} !important;
+    color: ${C.text} !important;
+    text-align: left;
+  }
+  th { color: ${C.accent} !important; font-weight: 600; }
+  img { display: none !important; }
+  figure, .thumb { display: none !important; }
+  .mw-references-wrap, .reflist { display: none !important; }
+  ul, ol { padding-left: 20px; }
+  li { margin: 4px 0; color: ${C.text} !important; }
+  blockquote {
+    border-left: 3px solid ${C.borderBright} !important;
+    margin: 10px 0; padding: 8px 14px;
+    color: ${C.muted} !important;
+  }
 `.replace(/\n/g, ' ');
 
 const INJECTED_JS = `
   (function() {
     var style = document.createElement('style');
-    style.textContent = '${INJECTED_CSS}';
+    style.textContent = ${JSON.stringify(INJECTED_CSS)};
     document.head.appendChild(style);
 
     document.addEventListener('click', function(e) {
@@ -48,7 +74,7 @@ const INJECTED_JS = `
         e.preventDefault();
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'wiki-link',
-          title: el.getAttribute('data-wiki') || el.href.replace('wiki://', '')
+          title: el.getAttribute('data-wiki') || decodeURIComponent(el.href.replace('wiki://', ''))
         }));
       }
     });
@@ -87,39 +113,37 @@ export function ArticleWebView({ html, articleTitle, onLinkPress }: Props) {
   );
 
   const handleNavigation = useCallback((request: WebViewNavigation) => {
-    // Block all navigations except our initial about:blank or data load
-    if (request.url.startsWith('wiki://')) return false;
     if (request.url === 'about:blank') return true;
-    return false;
+    if (request.url.startsWith('wiki://')) return false;
+    // Allow initial data load
+    return request.url.startsWith('data:') || request.url === 'about:blank';
   }, []);
 
   return (
-    <WebView
-      style={styles.webview}
-      originWhitelist={['*']}
-      source={{ html: FULL_HTML(html, articleTitle) }}
-      injectedJavaScript={INJECTED_JS}
-      onMessage={handleMessage}
-      onShouldStartLoadWithRequest={handleNavigation}
-      startInLoadingState
-      renderLoading={() => (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#0066cc" />
-        </View>
-      )}
-      scrollEnabled
-      showsVerticalScrollIndicator
-    />
+    <View style={styles.container}>
+      <WebView
+        style={styles.webview}
+        originWhitelist={['*']}
+        source={{ html: FULL_HTML(html, articleTitle) }}
+        injectedJavaScript={INJECTED_JS}
+        onMessage={handleMessage}
+        onShouldStartLoadWithRequest={handleNavigation}
+        startInLoadingState={false}
+        scrollEnabled
+        showsVerticalScrollIndicator={false}
+        backgroundColor={C.bg}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
   webview: {
     flex: 1,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: C.bg,
   },
 });

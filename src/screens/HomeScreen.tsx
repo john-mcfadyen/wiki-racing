@@ -6,24 +6,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, DailyChallenge, DailyRoute } from '../types';
 import { fetchDailyChallenge } from '../services/dailyChallenge';
+import { C, F, difficultyColor } from '../theme';
 
+const { width } = Dimensions.get('window');
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
-
-const DIFFICULTY_COLORS = {
-  easy: '#22c55e',
-  medium: '#f59e0b',
-  hard: '#ef4444',
-};
-
-const DIFFICULTY_LABELS = {
-  easy: 'Easy',
-  medium: 'Medium',
-  hard: 'Hard',
-};
 
 export function HomeScreen({ navigation }: Props) {
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null);
@@ -33,181 +24,321 @@ export function HomeScreen({ navigation }: Props) {
   useEffect(() => {
     fetchDailyChallenge()
       .then(setChallenge)
-      .catch((e) => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
-  function startGame(route: DailyRoute) {
-    navigation.navigate('Game', { route });
-  }
-
   const today = new Date();
-  const dateStr = today.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+  const dateStr = today
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    .toUpperCase();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.logo}>WikiRacer</Text>
-        <Text style={styles.tagline}>Navigate Wikipedia. Race the clock.</Text>
-        <Text style={styles.date}>{dateStr}</Text>
-      </View>
+    <View style={styles.root}>
+      {/* ambient glow behind logo */}
+      <View style={styles.glowCircle} />
 
-      {loading && <ActivityIndicator size="large" color="#0066cc" style={styles.loader} />}
-
-      {error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>Failed to load challenge: {error}</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── HERO ── */}
+        <View style={styles.hero}>
+          <Text style={styles.logo}>WIKI{'\n'}RACER</Text>
+          <Text style={styles.tagline}>navigate · race · win</Text>
+          <View style={styles.dateRow}>
+            <View style={styles.datePulse} />
+            <Text style={styles.dateText}>{dateStr} · DAILY CHALLENGE</Text>
+          </View>
         </View>
-      )}
 
-      {challenge && (
-        <View style={styles.challenges}>
-          <Text style={styles.sectionTitle}>Today's Challenges</Text>
-          {challenge.routes.map((route) => (
-            <RouteCard
+        {/* ── MISSIONS ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>// TODAY'S MISSIONS</Text>
+
+          {loading && (
+            <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} />
+          )}
+
+          {error && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>LOAD FAILED — {error}</Text>
+            </View>
+          )}
+
+          {challenge?.routes.map((route) => (
+            <MissionCard
               key={route.difficulty}
               route={route}
-              onPress={() => startGame(route)}
+              onPress={() => navigation.navigate('Game', { route })}
             />
           ))}
         </View>
-      )}
 
-      <View style={styles.howToPlay}>
-        <Text style={styles.sectionTitle}>How to Play</Text>
-        <Text style={styles.rule}>1. Start at one Wikipedia article</Text>
-        <Text style={styles.rule}>2. Click internal links to navigate</Text>
-        <Text style={styles.rule}>3. Reach the target article</Text>
-        <Text style={styles.rule}>4. Fewest clicks (closest to par) wins!</Text>
-      </View>
-    </ScrollView>
+        {/* ── HOW IT WORKS ── */}
+        <View style={styles.howto}>
+          <Text style={styles.sectionLabel}>// HOW IT WORKS</Text>
+          {[
+            ['01', 'START at a Wikipedia article'],
+            ['02', 'TAP only internal wiki links'],
+            ['03', 'REACH the target article'],
+            ['04', 'BEAT PAR — fewest clicks wins'],
+          ].map(([num, rule]) => (
+            <View key={num} style={styles.ruleRow}>
+              <Text style={styles.ruleNum}>{num}</Text>
+              <Text style={styles.ruleText}>{rule}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.footer}>Wikipedia content · CC BY-SA 4.0</Text>
+      </ScrollView>
+    </View>
   );
 }
 
-function RouteCard({ route, onPress }: { route: DailyRoute; onPress: () => void }) {
-  const color = DIFFICULTY_COLORS[route.difficulty];
+function MissionCard({ route, onPress }: { route: DailyRoute; onPress: () => void }) {
+  const color = difficultyColor(route.difficulty);
+  const diffLabel = route.difficulty.toUpperCase();
+
   return (
-    <TouchableOpacity style={styles.routeCard} onPress={onPress} activeOpacity={0.8}>
-      <View style={[styles.difficultyBadge, { backgroundColor: color }]}>
-        <Text style={styles.difficultyText}>{DIFFICULTY_LABELS[route.difficulty]}</Text>
-      </View>
-      <View style={styles.routeInfo}>
-        <Text style={styles.routePath} numberOfLines={1}>
-          {route.startTitle} → {route.endTitle}
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={styles.card}
+    >
+      {/* colored left rail */}
+      <View style={[styles.cardRail, { backgroundColor: color }]} />
+
+      <View style={styles.cardInner}>
+        <View style={styles.cardMeta}>
+          <View style={[styles.diffBadge, { borderColor: color }]}>
+            <Text style={[styles.diffBadgeText, { color }]}>{diffLabel}</Text>
+          </View>
+          <Text style={styles.parLabel}>PAR {route.parClicks}</Text>
+        </View>
+
+        <Text style={styles.routeTitle} numberOfLines={1}>
+          {route.startTitle}
+          <Text style={styles.routeArrow}> → </Text>
+          {route.endTitle}
         </Text>
-        <Text style={styles.routePar}>Par: {route.parClicks} clicks</Text>
       </View>
-      <Text style={styles.playArrow}>▶</Text>
+
+      <View style={[styles.playBtn, { borderColor: color, backgroundColor: `${color}12` }]}>
+        <Text style={[styles.playBtnText, { color }]}>▶</Text>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: C.bg,
   },
-  content: {
-    paddingBottom: 40,
+  glowCircle: {
+    position: 'absolute',
+    top: -120,
+    left: width / 2 - 160,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: C.accentGlow,
   },
-  header: {
-    backgroundColor: '#0066cc',
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 60,
+  },
+
+  // Hero
+  hero: {
+    paddingTop: 72,
+    paddingBottom: 36,
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 32,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   logo: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: -0.5,
+    fontFamily: F.display,
+    fontSize: 72,
+    lineHeight: 64,
+    letterSpacing: 6,
+    color: C.accent,
+    textShadowColor: C.accent,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 24,
   },
   tagline: {
-    fontSize: 14,
-    color: '#cce0ff',
-    marginTop: 4,
+    fontFamily: F.mono,
+    fontSize: 11,
+    color: C.muted,
+    letterSpacing: 3,
+    marginTop: 10,
+    textTransform: 'lowercase',
   },
-  date: {
-    fontSize: 13,
-    color: '#99c2ff',
-    marginTop: 8,
-  },
-  loader: {
-    marginTop: 60,
-  },
-  errorBox: {
-    margin: 24,
-    padding: 16,
-    backgroundColor: '#fff0f0',
-    borderRadius: 12,
-  },
-  errorText: {
-    color: '#cc3300',
-    fontSize: 14,
-  },
-  challenges: {
-    padding: 24,
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  routeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: 8,
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    width: '100%',
   },
-  difficultyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+  datePulse: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: C.accent,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 6,
+    shadowOpacity: 1,
   },
-  difficultyText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 12,
+  dateText: {
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.muted,
+    letterSpacing: 1.5,
   },
-  routeInfo: {
+
+  // Section
+  section: {
+    paddingHorizontal: 20,
+    gap: 10,
+    marginBottom: 8,
+  },
+  sectionLabel: {
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.muted,
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
+
+  // Mission card
+  card: {
+    flexDirection: 'row',
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+    minHeight: 72,
+  },
+  cardRail: {
+    width: 3,
+    alignSelf: 'stretch',
+  },
+  cardInner: {
     flex: 1,
-    gap: 2,
-  },
-  routePath: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  routePar: {
-    fontSize: 12,
-    color: '#888',
-  },
-  playArrow: {
-    fontSize: 16,
-    color: '#0066cc',
-  },
-  howToPlay: {
-    marginHorizontal: 24,
-    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     gap: 6,
   },
-  rule: {
-    fontSize: 14,
-    color: '#555',
-    paddingLeft: 4,
+  cardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  diffBadge: {
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  diffBadgeText: {
+    fontFamily: F.mono,
+    fontSize: 9,
+    letterSpacing: 1.5,
+  },
+  parLabel: {
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.muted,
+    letterSpacing: 1,
+  },
+  routeTitle: {
+    fontFamily: F.displayBold,
+    fontSize: 19,
+    color: C.text,
+    letterSpacing: 0.5,
+  },
+  routeArrow: {
+    color: C.muted,
+    fontFamily: F.displayBold,
+  },
+  playBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginRight: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playBtnText: {
+    fontSize: 13,
+  },
+
+  // How it works
+  howto: {
+    marginHorizontal: 20,
+    marginTop: 24,
+    padding: 20,
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: 14,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  ruleNum: {
+    fontFamily: F.mono,
+    fontSize: 11,
+    color: C.accent,
+    width: 22,
+    marginTop: 1,
+  },
+  ruleText: {
+    fontFamily: F.mono,
+    fontSize: 12,
+    color: C.muted,
+    flex: 1,
+    letterSpacing: 0.5,
+  },
+
+  // Footer
+  footer: {
+    fontFamily: F.mono,
+    fontSize: 9,
+    color: C.dim,
+    textAlign: 'center',
+    marginTop: 32,
+    letterSpacing: 1,
+  },
+
+  // Error
+  errorBox: {
+    padding: 14,
+    backgroundColor: C.dangerDim,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.danger,
+  },
+  errorText: {
+    fontFamily: F.mono,
+    fontSize: 11,
+    color: C.danger,
+    letterSpacing: 1,
   },
 });

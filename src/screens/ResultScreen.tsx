@@ -6,12 +6,15 @@ import {
   TouchableOpacity,
   ScrollView,
   Share,
+  Dimensions,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { useGameStore } from '../store/gameStore';
 import { buildShareText } from '../services/wikipedia';
+import { C, F } from '../theme';
 
+const { width } = Dimensions.get('window');
 type Props = NativeStackScreenProps<RootStackParamList, 'Result'>;
 
 export function ResultScreen({ navigation, route }: Props) {
@@ -21,8 +24,34 @@ export function ResultScreen({ navigation, route }: Props) {
 
   const isDNF = result.status === 'dnf';
   const diff = result.clicks - result.parClicks;
-  const diffStr = isDNF ? 'DNF' : diff === 0 ? 'Par!' : diff > 0 ? `+${diff}` : `${diff}`;
-  const diffColor = isDNF ? '#cc3300' : diff <= 0 ? '#22c55e' : diff <= 2 ? '#f59e0b' : '#cc3300';
+
+  const scoreLabel = isDNF
+    ? 'DNF'
+    : diff === 0
+    ? 'PAR'
+    : diff > 0
+    ? `+${diff}`
+    : `${diff}`;
+
+  const scoreColor = isDNF
+    ? C.danger
+    : diff < 0
+    ? C.easy
+    : diff === 0
+    ? C.accent
+    : diff <= 2
+    ? C.warning
+    : C.danger;
+
+  const outcomeLabel = isDNF
+    ? 'DID NOT FINISH'
+    : diff < 0
+    ? 'UNDER PAR'
+    : diff === 0
+    ? 'EXACTLY PAR'
+    : diff <= 2
+    ? 'OVER PAR'
+    : 'WAY OVER PAR';
 
   const mins = Math.floor(result.timeSeconds / 60);
   const secs = result.timeSeconds % 60;
@@ -47,130 +76,182 @@ export function ResultScreen({ navigation, route }: Props) {
   }, [race, result]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.scoreCard}>
-        {isDNF ? (
-          <>
-            <Text style={styles.dnfEmoji}>💀</Text>
-            <Text style={styles.dnfTitle}>Did Not Finish</Text>
-            <Text style={styles.dnfSubtitle}>Better luck tomorrow!</Text>
-          </>
-        ) : (
-          <>
-            <Text style={[styles.diffBadge, { color: diffColor }]}>{diffStr}</Text>
-            <Text style={styles.completedTitle}>Race Complete!</Text>
-          </>
-        )}
-      </View>
-
-      <View style={styles.statsGrid}>
-        <StatBox label="Clicks" value={isDNF ? '—' : String(result.clicks)} />
-        <StatBox label="Par" value={String(result.parClicks)} />
-        <StatBox label="Time" value={timeStr} />
-        <StatBox label="Hints" value={String(result.hintsUsed)} />
-      </View>
-
-      {!isDNF && (
-        <View style={styles.pathSection}>
-          <Text style={styles.pathTitle}>Your path</Text>
-          <View style={styles.pathList}>
-            {result.clickHistory.map((title, i) => (
-              <View key={i} style={styles.pathItem}>
-                {i > 0 && <Text style={styles.pathArrow}>↓</Text>}
-                <View
-                  style={[
-                    styles.pathBubble,
-                    i === 0 && styles.pathBubbleStart,
-                    i === result.clickHistory.length - 1 && styles.pathBubbleEnd,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.pathText,
-                      i === 0 && styles.pathTextStart,
-                      i === result.clickHistory.length - 1 && styles.pathTextEnd,
-                    ]}
-                  >
-                    {title}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      <View style={styles.actions}>
+    <View style={styles.root}>
+      {/* Score hero */}
+      <View style={styles.hero}>
+        <View style={[styles.glowBehindScore, { backgroundColor: `${scoreColor}18` }]} />
+        <Text style={[styles.scoreNum, { color: scoreColor, textShadowColor: scoreColor }]}>
+          {scoreLabel}
+        </Text>
+        <Text style={styles.outcomeLabel}>{outcomeLabel}</Text>
         {!isDNF && (
-          <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-            <Text style={styles.shareBtnText}>Share result</Text>
-          </TouchableOpacity>
+          <Text style={styles.heroSub}>
+            {result.clickHistory[0]} → {result.clickHistory[result.clickHistory.length - 1]}
+          </Text>
         )}
-        <TouchableOpacity style={styles.homeBtn} onPress={handleGoHome}>
-          <Text style={styles.homeBtnText}>Back to home</Text>
-        </TouchableOpacity>
       </View>
-    </ScrollView>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Stats grid */}
+        <View style={styles.statsRow}>
+          <StatBox label="CLICKS" value={isDNF ? '—' : String(result.clicks)} color={scoreColor} />
+          <View style={styles.statSep} />
+          <StatBox label="PAR" value={String(result.parClicks)} color={C.muted} />
+          <View style={styles.statSep} />
+          <StatBox label="TIME" value={timeStr} color={C.cyan} />
+          <View style={styles.statSep} />
+          <StatBox label="HINTS" value={String(result.hintsUsed)} color={C.warning} />
+        </View>
+
+        {/* Path visualization */}
+        {!isDNF && result.clickHistory.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>// YOUR PATH</Text>
+            <View style={styles.pathContainer}>
+              {result.clickHistory.map((title, i) => {
+                const isStart = i === 0;
+                const isEnd = i === result.clickHistory.length - 1;
+                const nodeColor = isStart || isEnd ? C.accent : C.muted;
+                return (
+                  <View key={i} style={styles.pathStep}>
+                    {i > 0 && (
+                      <View style={styles.pathConnector}>
+                        <View style={styles.pathLine} />
+                        <Text style={styles.pathArrow}>↓</Text>
+                        <View style={styles.pathLine} />
+                      </View>
+                    )}
+                    <View style={styles.pathNodeRow}>
+                      <View
+                        style={[
+                          styles.pathDot,
+                          {
+                            borderColor: nodeColor,
+                            backgroundColor: isStart || isEnd ? C.accentDim : 'transparent',
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.pathTitle,
+                          { color: isStart || isEnd ? C.accent : C.text },
+                          isEnd && {
+                            textShadowColor: C.accent,
+                            textShadowOffset: { width: 0, height: 0 },
+                            textShadowRadius: 6,
+                          },
+                        ]}
+                      >
+                        {title}
+                      </Text>
+                      {isStart && <Text style={styles.pathTag}>START</Text>}
+                      {isEnd && <Text style={styles.pathTag}>END</Text>}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          {!isDNF && (
+            <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.8}>
+              <Text style={styles.shareBtnText}>SHARE RESULT</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.homeBtn} onPress={handleGoHome} activeOpacity={0.8}>
+            <Text style={styles.homeBtnText}>BACK TO HOME</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.footer}>Wikipedia content · CC BY-SA 4.0</Text>
+      </ScrollView>
+    </View>
   );
 }
 
-function StatBox({ label, value }: { label: string; value: string }) {
+function StatBox({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}) {
   return (
     <View style={styles.statBox}>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: C.bg,
   },
-  content: {
+
+  // Hero
+  hero: {
+    alignItems: 'center',
+    paddingTop: 36,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
+    backgroundColor: C.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    overflow: 'hidden',
+  },
+  glowBehindScore: {
+    position: 'absolute',
+    top: -40,
+    left: width / 2 - 100,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+  },
+  scoreNum: {
+    fontFamily: F.display,
+    fontSize: 80,
+    lineHeight: 80,
+    letterSpacing: 4,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 32,
+  },
+  outcomeLabel: {
+    fontFamily: F.mono,
+    fontSize: 11,
+    color: C.muted,
+    letterSpacing: 3,
+    marginTop: 4,
+  },
+  heroSub: {
+    fontFamily: F.displayBold,
+    fontSize: 14,
+    color: C.dim,
+    marginTop: 10,
+    letterSpacing: 1,
+  },
+
+  scrollContent: {
     paddingBottom: 60,
   },
-  scoreCard: {
-    backgroundColor: '#0066cc',
-    paddingTop: 60,
-    paddingBottom: 32,
-    alignItems: 'center',
-    gap: 8,
-  },
-  diffBadge: {
-    fontSize: 52,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  completedTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#cce0ff',
-  },
-  dnfEmoji: {
-    fontSize: 52,
-  },
-  dnfTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  dnfSubtitle: {
-    fontSize: 14,
-    color: '#99c2ff',
-  },
-  statsGrid: {
+
+  // Stats
+  statsRow: {
     flexDirection: 'row',
-    margin: 20,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    backgroundColor: C.elevated,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
   },
   statBox: {
     flex: 1,
@@ -178,89 +259,135 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    fontFamily: F.monoBold,
+    fontSize: 22,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#888',
-    textTransform: 'uppercase',
+    fontFamily: F.mono,
+    fontSize: 8,
+    color: C.dim,
+    letterSpacing: 1.5,
   },
-  pathSection: {
-    marginHorizontal: 20,
+  statSep: {
+    width: 1,
+    backgroundColor: C.border,
+    marginVertical: 4,
+  },
+
+  // Section
+  section: {
+    margin: 20,
     gap: 12,
   },
-  pathTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
+  sectionLabel: {
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.muted,
+    letterSpacing: 1.5,
   },
-  pathList: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+
+  // Path
+  pathContainer: {
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
     padding: 16,
     gap: 0,
   },
-  pathItem: {
-    alignItems: 'flex-start',
+  pathStep: {
+    gap: 0,
+  },
+  pathNodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pathDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+  },
+  pathTitle: {
+    fontFamily: F.displayBold,
+    fontSize: 16,
+    flex: 1,
+    letterSpacing: 0.3,
+  },
+  pathTag: {
+    fontFamily: F.mono,
+    fontSize: 8,
+    color: C.accent,
+    letterSpacing: 1,
+    borderWidth: 1,
+    borderColor: C.accentGlow,
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  pathConnector: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingLeft: 4,
+    gap: 0,
+  },
+  pathLine: {
+    width: 1,
+    height: 6,
+    backgroundColor: C.border,
   },
   pathArrow: {
-    fontSize: 14,
-    color: '#0066cc',
-    marginLeft: 16,
-    marginVertical: 2,
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.dim,
+    lineHeight: 12,
   },
-  pathBubble: {
-    backgroundColor: '#f0f4ff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  pathBubbleStart: {
-    backgroundColor: '#e0edff',
-  },
-  pathBubbleEnd: {
-    backgroundColor: '#dcfce7',
-  },
-  pathText: {
-    fontSize: 14,
-    color: '#1a1a1a',
-    fontWeight: '500',
-  },
-  pathTextStart: {
-    color: '#0066cc',
-  },
-  pathTextEnd: {
-    color: '#16a34a',
-  },
+
+  // Actions
   actions: {
     marginHorizontal: 20,
-    marginTop: 24,
-    gap: 12,
+    marginTop: 8,
+    gap: 10,
   },
   shareBtn: {
-    backgroundColor: '#0066cc',
-    borderRadius: 12,
+    backgroundColor: C.accent,
+    borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 16,
+    shadowOpacity: 0.4,
+    elevation: 8,
   },
   shareBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
+    fontFamily: F.monoBold,
+    fontSize: 13,
+    color: C.bg,
+    letterSpacing: 2,
   },
   homeBtn: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e8e8e8',
+    borderColor: C.border,
   },
   homeBtnText: {
-    color: '#1a1a1a',
-    fontWeight: '600',
-    fontSize: 16,
+    fontFamily: F.mono,
+    fontSize: 13,
+    color: C.muted,
+    letterSpacing: 2,
+  },
+
+  footer: {
+    fontFamily: F.mono,
+    fontSize: 9,
+    color: C.dim,
+    textAlign: 'center',
+    marginTop: 28,
+    letterSpacing: 1,
   },
 });
