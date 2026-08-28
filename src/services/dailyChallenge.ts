@@ -3,6 +3,35 @@ import { validateWikiPages } from './wikipedia';
 
 // Hardcoded challenges for MVP — will be replaced with Supabase fetch
 const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
+  '20260828': {
+    id: '20260828',
+    routes: [
+      {
+        difficulty: 'easy',
+        startPageid: 7089,
+        startTitle: 'Chocolate',
+        endPageid: 3966054,
+        endTitle: 'Mexico',
+        parClicks: 3,
+      },
+      {
+        difficulty: 'medium',
+        startPageid: 11846,
+        startTitle: 'Guitar',
+        endPageid: 26667,
+        endTitle: 'Spain',
+        parClicks: 4,
+      },
+      {
+        difficulty: 'hard',
+        startPageid: 8311,
+        startTitle: 'Dinosaur',
+        endPageid: 19331,
+        endTitle: 'Moon',
+        parClicks: 5,
+      },
+    ],
+  },
   '20260827': {
     id: '20260827',
     routes: [
