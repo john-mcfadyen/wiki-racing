@@ -27,6 +27,7 @@ export interface Race {
 }
 
 export interface DailyRoute {
+  challengeId: string; // YYYYMMDD — needed for result persistence
   difficulty: Difficulty;
   startPageid: number;
   startTitle: string;

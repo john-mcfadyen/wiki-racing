@@ -13,6 +13,7 @@ import { fetchArticleHtml } from '../services/wikipedia';
 import { ArticleWebView } from '../components/ArticleWebView';
 import { GameHeader } from '../components/GameHeader';
 import { C, F } from '../theme';
+import { saveResult } from '../services/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Game'>;
 
@@ -62,6 +63,7 @@ export function GameScreen({ navigation, route: navRoute }: Props) {
       if (normalizedClicked === normalizedTarget) {
         const result = completeRace();
         if (result) {
+          await saveResult(route.challengeId, route.difficulty, result);
           navigation.replace('Result', { result });
         }
         return;
@@ -88,9 +90,10 @@ export function GameScreen({ navigation, route: navRoute }: Props) {
     setHint({ type: hintType, text: hintMessages[hintType] ?? '' });
   }
 
-  function handleGiveUp() {
+  async function handleGiveUp() {
     const result = forfeitRace();
     if (result) {
+      await saveResult(route.challengeId, route.difficulty, result);
       navigation.replace('Result', { result });
     }
   }

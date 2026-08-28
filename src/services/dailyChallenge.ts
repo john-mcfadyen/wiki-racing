@@ -7,6 +7,7 @@ const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
     id: '20260828',
     routes: [
       {
+        challengeId: '20260828',
         difficulty: 'easy',
         startPageid: 7089,
         startTitle: 'Chocolate',
@@ -15,6 +16,7 @@ const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
         parClicks: 3,
       },
       {
+        challengeId: '20260828',
         difficulty: 'medium',
         startPageid: 11846,
         startTitle: 'Guitar',
@@ -23,6 +25,7 @@ const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
         parClicks: 4,
       },
       {
+        challengeId: '20260828',
         difficulty: 'hard',
         startPageid: 8311,
         startTitle: 'Dinosaur',
@@ -36,6 +39,7 @@ const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
     id: '20260827',
     routes: [
       {
+        challengeId: '20260827',
         difficulty: 'easy',
         startPageid: 25202,
         startTitle: 'Cat',
@@ -44,6 +48,7 @@ const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
         parClicks: 3,
       },
       {
+        challengeId: '20260827',
         difficulty: 'medium',
         startPageid: 18717,
         startTitle: 'Pizza',
@@ -52,6 +57,7 @@ const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
         parClicks: 4,
       },
       {
+        challengeId: '20260827',
         difficulty: 'hard',
         startPageid: 17914,
         startTitle: 'Ludwig van Beethoven',

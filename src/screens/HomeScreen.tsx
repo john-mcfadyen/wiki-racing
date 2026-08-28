@@ -9,8 +9,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList, DailyChallenge, DailyRoute } from '../types';
+import { useFocusEffect } from '@react-navigation/native';
+import { RootStackParamList, DailyChallenge, DailyRoute, RaceResult, Difficulty } from '../types';
 import { fetchDailyChallenge } from '../services/dailyChallenge';
+import { loadAllResults } from '../services/storage';
 import { C, F, difficultyColor, textGlow, boxGlow } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -20,6 +22,7 @@ export function HomeScreen({ navigation }: Props) {
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<Partial<Record<Difficulty, RaceResult>>>({});
 
   useEffect(() => {
     fetchDailyChallenge()
@@ -28,6 +31,22 @@ export function HomeScreen({ navigation }: Props) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Reload results every time this screen comes into focus (e.g. after finishing a race)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!challenge) return;
+      const difficulties = challenge.routes.map((r) => r.difficulty);
+      loadAllResults(challenge.id, difficulties).then(setResults);
+    }, [challenge])
+  );
+
+  // Also load results once challenge is first available
+  useEffect(() => {
+    if (!challenge) return;
+    const difficulties = challenge.routes.map((r) => r.difficulty);
+    loadAllResults(challenge.id, difficulties).then(setResults);
+  }, [challenge]);
+
   const today = new Date();
   const dateStr = today
     .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -35,7 +54,6 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      {/* ambient glow behind logo */}
       <View style={styles.glowCircle} />
 
       <ScrollView
@@ -43,7 +61,6 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── HERO ── */}
         <View style={styles.hero}>
           <Text style={styles.logo}>WIKI{'\n'}RACER</Text>
           <Text style={styles.tagline}>navigate · race · win</Text>
@@ -53,7 +70,6 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* ── MISSIONS ── */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>// TODAY'S MISSIONS</Text>
 
@@ -71,12 +87,12 @@ export function HomeScreen({ navigation }: Props) {
             <MissionCard
               key={route.difficulty}
               route={route}
+              result={results[route.difficulty] ?? null}
               onPress={() => navigation.navigate('Game', { route })}
             />
           ))}
         </View>
 
-        {/* ── HOW IT WORKS ── */}
         <View style={styles.howto}>
           <Text style={styles.sectionLabel}>// HOW IT WORKS</Text>
           {[
@@ -98,38 +114,80 @@ export function HomeScreen({ navigation }: Props) {
   );
 }
 
-function MissionCard({ route, onPress }: { route: DailyRoute; onPress: () => void }) {
+function MissionCard({
+  route,
+  result,
+  onPress,
+}: {
+  route: DailyRoute;
+  result: RaceResult | null;
+  onPress: () => void;
+}) {
   const color = difficultyColor(route.difficulty);
-  const diffLabel = route.difficulty.toUpperCase();
+  const isDone = result !== null;
+
+  const content = isDone ? (
+    <ResultSummary result={result} color={color} />
+  ) : (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.cardTouchable}>
+      <View style={[styles.playBtn, { borderColor: color, backgroundColor: `${color}12` }]}>
+        <Text style={[styles.playBtnText, { color }]}>▶</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={styles.card}
-    >
-      {/* colored left rail */}
+    <View style={[styles.card, isDone && styles.cardDone]}>
       <View style={[styles.cardRail, { backgroundColor: color }]} />
-
       <View style={styles.cardInner}>
         <View style={styles.cardMeta}>
           <View style={[styles.diffBadge, { borderColor: color }]}>
-            <Text style={[styles.diffBadgeText, { color }]}>{diffLabel}</Text>
+            <Text style={[styles.diffBadgeText, { color }]}>
+              {route.difficulty.toUpperCase()}
+            </Text>
           </View>
           <Text style={styles.parLabel}>PAR {route.parClicks}</Text>
         </View>
-
         <Text style={styles.routeTitle} numberOfLines={1}>
           {route.startTitle}
           <Text style={styles.routeArrow}> → </Text>
           {route.endTitle}
         </Text>
       </View>
+      {content}
+    </View>
+  );
+}
 
-      <View style={[styles.playBtn, { borderColor: color, backgroundColor: `${color}12` }]}>
-        <Text style={[styles.playBtnText, { color }]}>▶</Text>
-      </View>
-    </TouchableOpacity>
+function ResultSummary({ result, color }: { result: RaceResult; color: string }) {
+  const isDNF = result.status === 'dnf';
+  const diff = result.clicks - result.parClicks;
+  const diffLabel = isDNF ? 'DNF' : diff === 0 ? 'PAR' : diff > 0 ? `+${diff}` : `${diff}`;
+  const diffColor = isDNF
+    ? C.danger
+    : diff < 0
+    ? C.easy
+    : diff === 0
+    ? C.accent
+    : diff <= 2
+    ? C.warning
+    : C.danger;
+
+  const mins = Math.floor(result.timeSeconds / 60);
+  const secs = result.timeSeconds % 60;
+  const timeStr = mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
+
+  return (
+    <View style={styles.resultSummary}>
+      <Text style={[styles.resultDiff, { color: diffColor, ...textGlow(diffColor, 8) }]}>
+        {diffLabel}
+      </Text>
+      {!isDNF && (
+        <Text style={styles.resultDetail}>
+          {result.clicks} clicks · {timeStr}
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -147,14 +205,9 @@ const styles = StyleSheet.create({
     borderRadius: 160,
     backgroundColor: C.accentGlow,
   },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 60,
-  },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 60 },
 
-  // Hero
   hero: {
     paddingTop: 72,
     paddingBottom: 36,
@@ -175,7 +228,6 @@ const styles = StyleSheet.create({
     color: C.muted,
     letterSpacing: 3,
     marginTop: 10,
-    textTransform: 'lowercase',
   },
   dateRow: {
     flexDirection: 'row',
@@ -201,7 +253,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
 
-  // Section
   section: {
     paddingHorizontal: 20,
     gap: 10,
@@ -215,7 +266,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 
-  // Mission card
   card: {
     flexDirection: 'row',
     backgroundColor: C.surface,
@@ -225,6 +275,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     minHeight: 72,
+  },
+  cardDone: {
+    borderColor: C.borderBright,
+    backgroundColor: C.elevated,
   },
   cardRail: {
     width: 3,
@@ -240,6 +294,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  cardTouchable: {
+    paddingRight: 14,
   },
   diffBadge: {
     borderWidth: 1,
@@ -273,7 +330,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 8,
     borderWidth: 1,
-    marginRight: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -281,7 +337,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // How it works
+  // Result summary shown in place of play button
+  resultSummary: {
+    paddingRight: 16,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  resultDiff: {
+    fontFamily: F.display,
+    fontSize: 28,
+    letterSpacing: 1,
+  },
+  resultDetail: {
+    fontFamily: F.mono,
+    fontSize: 9,
+    color: C.muted,
+    letterSpacing: 0.5,
+  },
+
   howto: {
     marginHorizontal: 20,
     marginTop: 24,
@@ -312,7 +385,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Footer
   footer: {
     fontFamily: F.mono,
     fontSize: 9,
@@ -321,8 +393,6 @@ const styles = StyleSheet.create({
     marginTop: 32,
     letterSpacing: 1,
   },
-
-  // Error
   errorBox: {
     padding: 14,
     backgroundColor: C.dangerDim,
