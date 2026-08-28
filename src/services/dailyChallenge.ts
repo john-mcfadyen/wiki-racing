@@ -1,4 +1,5 @@
-import { DailyChallenge } from '../types';
+import { DailyChallenge, DailyRoute } from '../types';
+import { validateWikiPages } from './wikipedia';
 
 // Hardcoded challenges for MVP — will be replaced with Supabase fetch
 const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
@@ -41,15 +42,51 @@ function getTodayId(): string {
   return `${y}${m}${day}`;
 }
 
-export async function fetchDailyChallenge(): Promise<DailyChallenge> {
-  const todayId = getTodayId();
+/**
+ * Validates all pages referenced in a set of routes with a single batched
+ * API call. Returns routes that pass validation; logs warnings for any that
+ * are skipped (missing, redirect, or disambiguation pages).
+ */
+async function filterValidRoutes(routes: DailyRoute[]): Promise<DailyRoute[]> {
+  // Collect every unique title that needs checking
+  const allTitles = Array.from(
+    new Set(routes.flatMap((r) => [r.startTitle, r.endTitle]))
+  );
 
-  // Try hardcoded first (MVP)
-  if (HARDCODED_CHALLENGES[todayId]) {
-    return HARDCODED_CHALLENGES[todayId];
+  const validations = await validateWikiPages(allTitles);
+
+  const valid: DailyRoute[] = [];
+  for (const route of routes) {
+    const startV = validations.get(route.startTitle);
+    const endV = validations.get(route.endTitle);
+
+    const startOk = startV?.valid ?? false;
+    const endOk = endV?.valid ?? false;
+
+    if (startOk && endOk) {
+      valid.push(route);
+    } else {
+      const problems: string[] = [];
+      if (!startOk) problems.push(`start "${route.startTitle}": ${startV?.reason ?? 'unknown'}`);
+      if (!endOk) problems.push(`end "${route.endTitle}": ${endV?.reason ?? 'unknown'}`);
+      console.warn(`[WikiRacer] Skipping ${route.difficulty} route — ${problems.join(', ')}`);
+    }
   }
 
-  // Fallback: return the most recent hardcoded challenge
-  const keys = Object.keys(HARDCODED_CHALLENGES).sort().reverse();
-  return HARDCODED_CHALLENGES[keys[0]];
+  return valid;
+}
+
+export async function fetchDailyChallenge(): Promise<DailyChallenge> {
+  const todayId = getTodayId();
+  const raw =
+    HARDCODED_CHALLENGES[todayId] ??
+    HARDCODED_CHALLENGES[Object.keys(HARDCODED_CHALLENGES).sort().at(-1)!];
+
+  const validRoutes = await filterValidRoutes(raw.routes);
+
+  if (validRoutes.length === 0) {
+    throw new Error('No valid routes available for today\'s challenge.');
+  }
+
+  return { ...raw, routes: validRoutes };
 }

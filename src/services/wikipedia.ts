@@ -2,6 +2,79 @@ import { WikiArticle } from '../types';
 
 const ACTION_API = 'https://en.wikipedia.org/w/api.php';
 
+export type PageInvalidReason = 'missing' | 'redirect' | 'disambiguation';
+
+export interface PageValidation {
+  title: string;         // canonical title as returned by API
+  valid: boolean;
+  reason?: PageInvalidReason;
+}
+
+/**
+ * Batch-validates Wikipedia page titles in a single API call.
+ * Returns a map keyed by the *input* title (case-insensitive match).
+ * Detects: missing pages, redirects, disambiguation pages.
+ */
+export async function validateWikiPages(
+  titles: string[]
+): Promise<Map<string, PageValidation>> {
+  const params = new URLSearchParams({
+    action: 'query',
+    titles: titles.join('|'),
+    prop: 'info|pageprops',
+    format: 'json',
+    origin: '*',
+  });
+
+  const res = await fetch(`${ACTION_API}?${params}`);
+  if (!res.ok) throw new Error(`Wikipedia API error: ${res.status}`);
+  const data = await res.json();
+
+  // Build a normalisation map: lowercase input title → canonical title
+  // The API returns a `normalized` array when it changes capitalisation.
+  const normMap = new Map<string, string>();
+  for (const entry of (data.query?.normalized ?? []) as { from: string; to: string }[]) {
+    normMap.set(entry.from.toLowerCase(), entry.to);
+  }
+  // Also map each input title to itself as a fallback
+  for (const t of titles) {
+    if (!normMap.has(t.toLowerCase())) normMap.set(t.toLowerCase(), t);
+  }
+
+  const results = new Map<string, PageValidation>();
+
+  for (const page of Object.values(data.query?.pages ?? {}) as Record<string, unknown>[]) {
+    const p = page as {
+      title: string;
+      missing?: unknown;
+      redirect?: unknown;
+      pageprops?: { disambiguation?: unknown };
+    };
+
+    let valid = true;
+    let reason: PageInvalidReason | undefined;
+
+    if ('missing' in p) {
+      valid = false; reason = 'missing';
+    } else if ('redirect' in p) {
+      valid = false; reason = 'redirect';
+    } else if (p.pageprops?.disambiguation !== undefined) {
+      valid = false; reason = 'disambiguation';
+    }
+
+    // Map back to every input title that resolved to this canonical title
+    for (const [lc, canonical] of normMap) {
+      if (canonical === p.title) {
+        // Find the original casing from the input array
+        const original = titles.find((t) => t.toLowerCase() === lc) ?? p.title;
+        results.set(original, { title: p.title, valid, reason });
+      }
+    }
+  }
+
+  return results;
+}
+
 export async function fetchArticleHtml(title: string): Promise<WikiArticle> {
   // Use the Action API parse endpoint — it sends origin=* which enables CORS
   // for browser/web environments. The REST API (rest_v1) mobile-sections endpoint
