@@ -53,9 +53,9 @@ const HARDCODED_CHALLENGES: Record<string, DailyChallenge> = {
       },
       {
         difficulty: 'hard',
-        startPageid: 22567,
-        startTitle: 'Beethoven',
-        endPageid: 45448,
+        startPageid: 17914,
+        startTitle: 'Ludwig van Beethoven',
+        endPageid: 25202,
         endTitle: 'Quantum mechanics',
         parClicks: 5,
       },

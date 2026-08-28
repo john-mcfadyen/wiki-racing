@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useGameStore } from '../store/gameStore';
-import { C, F } from '../theme';
+import { C, F, textGlow, boxGlow } from '../theme';
 
 interface Props {
   onGiveUp: () => void;
@@ -160,10 +160,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: C.accent,
-    shadowColor: C.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 5,
-    shadowOpacity: 1,
+    ...boxGlow(C.accent, 5, 1),
   },
   targetLabel: {
     fontFamily: F.mono,
@@ -177,9 +174,7 @@ const styles = StyleSheet.create({
     color: C.accent,
     flex: 1,
     letterSpacing: 0.5,
-    textShadowColor: C.accent,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
+    ...textGlow(C.accent, 8),
   },
   bottomRow: {
     flexDirection: 'row',

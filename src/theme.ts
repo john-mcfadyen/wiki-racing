@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export const C = {
   bg: '#07070A',
   surface: '#0E0E16',
@@ -39,4 +41,35 @@ export function difficultyColor(d: string): string {
   if (d === 'easy') return C.easy;
   if (d === 'medium') return C.medium;
   return C.hard;
+}
+
+// Platform-safe text glow. Web uses the CSS textShadow shorthand;
+// native uses the individual textShadow* props (RNW deprecated them).
+export function textGlow(color: string, radius: number): object {
+  return (
+    Platform.select({
+      web: { textShadow: `0 0 ${radius}px ${color}` },
+      default: {
+        textShadowColor: color,
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: radius,
+      },
+    }) ?? {}
+  );
+}
+
+// Platform-safe box / drop glow.
+export function boxGlow(color: string, radius: number, opacity = 0.8): object {
+  return (
+    Platform.select({
+      web: { boxShadow: `0 0 ${radius}px ${color}` },
+      default: {
+        shadowColor: color,
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: radius,
+        shadowOpacity: opacity,
+        elevation: Math.ceil(radius / 2),
+      },
+    }) ?? {}
+  );
 }

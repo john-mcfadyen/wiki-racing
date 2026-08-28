@@ -12,7 +12,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { useGameStore } from '../store/gameStore';
 import { buildShareText } from '../services/wikipedia';
-import { C, F } from '../theme';
+import { C, F, textGlow, boxGlow } from '../theme';
 
 const { width } = Dimensions.get('window');
 type Props = NativeStackScreenProps<RootStackParamList, 'Result'>;
@@ -80,10 +80,15 @@ export function ResultScreen({ navigation, route }: Props) {
       {/* Score hero */}
       <View style={styles.hero}>
         <View style={[styles.glowBehindScore, { backgroundColor: `${scoreColor}18` }]} />
-        <Text style={[styles.scoreNum, { color: scoreColor, textShadowColor: scoreColor }]}>
+        <Text style={[styles.scoreNum, { color: scoreColor, ...textGlow(scoreColor, 32) }]}>
           {scoreLabel}
         </Text>
         <Text style={styles.outcomeLabel}>{outcomeLabel}</Text>
+        {!isDNF && (
+          <Text style={styles.heroPar}>
+            {result.clicks} clicks · par {result.parClicks}
+          </Text>
+        )}
         {!isDNF && (
           <Text style={styles.heroSub}>
             {result.clickHistory[0]} → {result.clickHistory[result.clickHistory.length - 1]}
@@ -138,11 +143,7 @@ export function ResultScreen({ navigation, route }: Props) {
                         style={[
                           styles.pathTitle,
                           { color: isStart || isEnd ? C.accent : C.text },
-                          isEnd && {
-                            textShadowColor: C.accent,
-                            textShadowOffset: { width: 0, height: 0 },
-                            textShadowRadius: 6,
-                          },
+                          isEnd && textGlow(C.accent, 6),
                         ]}
                       >
                         {title}
@@ -222,8 +223,7 @@ const styles = StyleSheet.create({
     fontSize: 80,
     lineHeight: 80,
     letterSpacing: 4,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 32,
+    ...textGlow(C.accent, 32),
   },
   outcomeLabel: {
     fontFamily: F.mono,
@@ -232,12 +232,19 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginTop: 4,
   },
+  heroPar: {
+    fontFamily: F.monoBold,
+    fontSize: 16,
+    color: C.text,
+    letterSpacing: 1,
+    marginTop: 10,
+  },
   heroSub: {
     fontFamily: F.displayBold,
-    fontSize: 14,
-    color: C.dim,
-    marginTop: 10,
-    letterSpacing: 1,
+    fontSize: 13,
+    color: C.muted,
+    marginTop: 6,
+    letterSpacing: 0.5,
   },
 
   scrollContent: {
@@ -355,10 +362,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: C.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 16,
-    shadowOpacity: 0.4,
+    ...boxGlow(C.accent, 16, 0.4),
     elevation: 8,
   },
   shareBtnText: {

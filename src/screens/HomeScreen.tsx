@@ -11,7 +11,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, DailyChallenge, DailyRoute } from '../types';
 import { fetchDailyChallenge } from '../services/dailyChallenge';
-import { C, F, difficultyColor } from '../theme';
+import { C, F, difficultyColor, textGlow, boxGlow } from '../theme';
 
 const { width } = Dimensions.get('window');
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -167,9 +167,7 @@ const styles = StyleSheet.create({
     lineHeight: 64,
     letterSpacing: 6,
     color: C.accent,
-    textShadowColor: C.accent,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 24,
+    ...textGlow(C.accent, 24),
   },
   tagline: {
     fontFamily: F.mono,
@@ -194,10 +192,7 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: C.accent,
-    shadowColor: C.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 6,
-    shadowOpacity: 1,
+    ...boxGlow(C.accent, 6, 1),
   },
   dateText: {
     fontFamily: F.mono,
