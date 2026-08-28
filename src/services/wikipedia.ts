@@ -45,9 +45,35 @@ export async function fetchArticleByPageid(pageid: number): Promise<WikiArticle>
   return fetchArticleHtml(page.title);
 }
 
+// Headings that mark the end of navigable article content.
+// Everything from the first match onwards is cut — these sections
+// often contain the target article as a direct link, which would
+// trivialise the game.
+const END_SECTION_HEADINGS = [
+  'See also', 'References', 'External links', 'Further reading',
+  'Notes', 'Bibliography', 'Footnotes', 'Sources', 'Citations',
+];
+
+function truncateAtEndSections(html: string): string {
+  // Matches <h2> or <h3> that contains any of the end-section labels,
+  // accounting for nested spans the Action API wraps headings in.
+  const labels = END_SECTION_HEADINGS.map((l) =>
+    l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  ).join('|');
+  const pattern = new RegExp(
+    `<h[23][^>]*>(?:<[^>]+>\\s*)*(?:${labels})(?:\\s*<[^>]+>)*\\s*</h[23]>`,
+    'i'
+  );
+  const match = pattern.exec(html);
+  return match ? html.slice(0, match.index) : html;
+}
+
 function stripWikipediaHtml(html: string): string {
+  // Cut end-matter sections first (See also, References, etc.)
+  let result = truncateAtEndSections(html);
+
   // Remove elements we don't want
-  let result = html
+  result = result
     // Remove reference sections, edit sections, external link sections
     .replace(/<section[^>]*data-mw-section-id="0"[^>]*>/gi, '')
     // Remove citation/reference markers [1], [2], etc.
