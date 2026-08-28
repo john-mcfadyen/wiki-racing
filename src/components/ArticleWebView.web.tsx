@@ -7,29 +7,22 @@ interface Props {
   onLinkPress: (title: string) => void;
 }
 
+const SKIP_PREFIXES = [
+  'Wikipedia:', 'File:', 'Special:', 'Help:', 'Talk:', 'User:',
+  'Category:', 'Template:', 'Portal:', 'WP:', 'Image:', 'Media:',
+  'MediaWiki:', 'Module:', 'Draft:',
+];
+
 const CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    height: 100%;
-    background: ${C.bg};
-    color: ${C.text};
-    font-family: Inter, -apple-system, system-ui, sans-serif;
-    font-size: 15px;
-    line-height: 1.65;
-    overflow-x: hidden;
-  }
+  html, body { height: 100%; background: ${C.bg}; color: ${C.text}; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 15px; line-height: 1.65; overflow-x: hidden; }
   body { padding: 0 18px 60px; }
   h1 { font-size: 22px; font-weight: 700; margin: 20px 0 10px; }
   h2 { font-size: 17px; font-weight: 600; margin: 20px 0 8px; padding-bottom: 8px; border-bottom: 1px solid ${C.border}; }
   h3 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; }
   p { margin: 8px 0; }
-  a[href^="wiki://"] {
-    color: ${C.accent};
-    text-decoration: none;
-    border-bottom: 1px solid rgba(109,255,109,0.25);
-    cursor: pointer;
-  }
-  a[href^="wiki://"]:hover { background: ${C.accentGlow}; border-radius: 2px; }
+  a[href^="wiki://"], a[href^="/wiki/"] { color: ${C.accent}; text-decoration: none; border-bottom: 1px solid rgba(109,255,109,0.25); cursor: pointer; }
+  a[href^="wiki://"]:hover, a[href^="/wiki/"]:hover { background: ${C.accentGlow}; border-radius: 2px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
   td, th { padding: 6px 10px; border: 1px solid ${C.border}; text-align: left; }
   th { color: ${C.accent}; font-weight: 600; }
@@ -40,11 +33,34 @@ const CSS = `
 `;
 
 const SCRIPT = `
+  var skipPrefixes = ${JSON.stringify(SKIP_PREFIXES)};
+
+  function extractWikiTitle(href) {
+    if (!href || href.startsWith('#') || href.startsWith('mailto:')) return null;
+    var raw = null;
+    if (href.startsWith('wiki://')) {
+      raw = decodeURIComponent(href.slice(7));
+    } else if (href.startsWith('/wiki/')) {
+      raw = decodeURIComponent(href.slice(6)).split('#')[0].split('?')[0];
+    } else {
+      var m = href.match(/wikipedia\\.org\\/wiki\\/([^#?]+)/);
+      if (m) raw = decodeURIComponent(m[1]);
+    }
+    if (!raw) return null;
+    raw = raw.replace(/_/g, ' ').trim();
+    for (var i = 0; i < skipPrefixes.length; i++) {
+      if (raw.indexOf(skipPrefixes[i]) === 0) return null;
+    }
+    return raw || null;
+  }
+
   document.addEventListener('click', function(e) {
-    var el = e.target.closest('a[href^="wiki://"]');
-    if (el) {
+    var el = e.target.closest('a');
+    if (!el) return;
+    var href = el.getAttribute('href') || '';
+    var title = el.getAttribute('data-wiki') || extractWikiTitle(href);
+    if (title) {
       e.preventDefault();
-      var title = el.getAttribute('data-wiki') || decodeURIComponent(el.href.replace('wiki://', ''));
       window.parent.postMessage({ type: 'wiki-link', title: title }, '*');
     }
   });

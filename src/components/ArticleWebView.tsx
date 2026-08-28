@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
-import { C, F } from '../theme';
+import { C } from '../theme';
 
 interface Props {
   html: string;
@@ -9,81 +9,75 @@ interface Props {
   onLinkPress: (title: string) => void;
 }
 
-const INJECTED_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
-  html, body {
-    background-color: ${C.bg} !important;
-    margin: 0; padding: 0;
-  }
-  body {
-    font-family: 'Inter', -apple-system, system-ui, sans-serif;
-    font-size: 15px;
-    line-height: 1.65;
-    color: ${C.text} !important;
-    padding: 0 18px 60px;
-    max-width: 100%;
-  }
-  * { background-color: transparent !important; color: ${C.text} !important; }
-  h1 { font-size: 22px; font-weight: 700; margin: 20px 0 10px; color: ${C.text} !important; }
-  h2 {
-    font-size: 17px; font-weight: 600; margin: 20px 0 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid ${C.border} !important;
-    color: ${C.text} !important;
-  }
-  h3 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; color: ${C.text} !important; }
-  p { margin: 8px 0; }
-  a[href^="wiki://"] {
-    color: ${C.accent} !important;
-    text-decoration: none !important;
-    border-bottom: 1px solid rgba(109,255,109,0.25) !important;
-  }
-  a[href^="wiki://"]:active { background-color: ${C.accentGlow} !important; border-radius: 2px; }
-  table {
-    width: 100%; border-collapse: collapse; font-size: 13px;
-    margin: 10px 0; border: 1px solid ${C.border} !important;
-  }
-  td, th {
-    padding: 6px 10px;
-    border: 1px solid ${C.border} !important;
-    color: ${C.text} !important;
-    text-align: left;
-  }
-  th { color: ${C.accent} !important; font-weight: 600; }
-  img { display: none !important; }
-  figure, .thumb { display: none !important; }
-  .mw-references-wrap, .reflist { display: none !important; }
-  ul, ol { padding-left: 20px; }
-  li { margin: 4px 0; color: ${C.text} !important; }
-  blockquote {
-    border-left: 3px solid ${C.borderBright} !important;
-    margin: 10px 0; padding: 8px 14px;
-    color: ${C.muted} !important;
-  }
-`.replace(/\n/g, ' ');
+// Namespaces that should not be navigable in-game
+const SKIP_PREFIXES = [
+  'Wikipedia:', 'File:', 'Special:', 'Help:', 'Talk:', 'User:',
+  'Category:', 'Template:', 'Portal:', 'WP:', 'Image:', 'Media:',
+  'MediaWiki:', 'Module:', 'Draft:',
+];
 
-const INJECTED_JS = `
-  (function() {
-    var style = document.createElement('style');
-    style.textContent = ${JSON.stringify(INJECTED_CSS)};
-    document.head.appendChild(style);
+function buildInjectedJs(bg: string, text: string, accent: string, border: string, muted: string, borderBright: string, accentGlow: string): string {
+  const skipPrefixes = JSON.stringify(SKIP_PREFIXES);
+  return `
+(function() {
+  var style = document.createElement('style');
+  style.textContent = [
+    'html,body{background:${bg}!important;margin:0;padding:0}',
+    'body{font-family:-apple-system,system-ui,sans-serif;font-size:15px;line-height:1.65;color:${text}!important;padding:0 18px 60px}',
+    '*{background-color:transparent!important;color:${text}!important}',
+    'h1{font-size:22px;font-weight:700;margin:20px 0 10px}',
+    'h2{font-size:17px;font-weight:600;margin:20px 0 8px;padding-bottom:8px;border-bottom:1px solid ${border}!important}',
+    'h3{font-size:15px;font-weight:600;margin:14px 0 6px}',
+    'p{margin:8px 0}',
+    'a[href^="wiki://"],a[href^="/wiki/"]{color:${accent}!important;text-decoration:none!important;border-bottom:1px solid rgba(109,255,109,0.25)!important}',
+    'a[href^="wiki://"]:active,a[href^="/wiki/"]:active{background:${accentGlow}!important;border-radius:2px}',
+    'table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}',
+    'td,th{padding:6px 10px;border:1px solid ${border}!important;text-align:left}',
+    'th{color:${accent}!important;font-weight:600}',
+    'img,figure,.thumb,.mw-references-wrap,.reflist{display:none!important}',
+    'ul,ol{padding-left:20px}',
+    'li{margin:4px 0}',
+    'blockquote{border-left:3px solid ${borderBright}!important;margin:10px 0;padding:8px 14px;color:${muted}!important}',
+  ].join('');
+  document.head.appendChild(style);
 
-    document.addEventListener('click', function(e) {
-      var el = e.target.closest('a[href^="wiki://"]');
-      if (el) {
-        e.preventDefault();
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'wiki-link',
-          title: el.getAttribute('data-wiki') || decodeURIComponent(el.href.replace('wiki://', ''))
-        }));
-      }
-    });
-  })();
-  true;
-`;
+  var skipPrefixes = ${skipPrefixes};
 
-const FULL_HTML = (body: string, title: string) => `
-<!DOCTYPE html>
+  function extractWikiTitle(href) {
+    if (!href || href.startsWith('#') || href.startsWith('mailto:')) return null;
+    var raw = null;
+    if (href.startsWith('wiki://')) {
+      raw = decodeURIComponent(href.slice(7));
+    } else if (href.startsWith('/wiki/')) {
+      raw = decodeURIComponent(href.slice(6)).split('#')[0].split('?')[0];
+    } else {
+      var m = href.match(/wikipedia\\.org\\/wiki\\/([^#?]+)/);
+      if (m) raw = decodeURIComponent(m[1]);
+    }
+    if (!raw) return null;
+    raw = raw.replace(/_/g, ' ').trim();
+    for (var i = 0; i < skipPrefixes.length; i++) {
+      if (raw.indexOf(skipPrefixes[i]) === 0) return null;
+    }
+    return raw || null;
+  }
+
+  document.addEventListener('click', function(e) {
+    var el = e.target.closest('a');
+    if (!el) return;
+    var href = el.getAttribute('href') || '';
+    var title = el.getAttribute('data-wiki') || extractWikiTitle(href);
+    if (title) {
+      e.preventDefault();
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'wiki-link', title: title }));
+    }
+  });
+})();
+true;
+`.trim();
+}
+
+const FULL_HTML = (body: string, title: string) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -94,10 +88,13 @@ const FULL_HTML = (body: string, title: string) => `
   <h1>${title}</h1>
   ${body}
 </body>
-</html>
-`;
+</html>`;
 
 export function ArticleWebView({ html, articleTitle, onLinkPress }: Props) {
+  const injectedJS = buildInjectedJs(
+    C.bg, C.text, C.accent, C.border, C.muted, C.borderBright, C.accentGlow
+  );
+
   const handleMessage = useCallback(
     (event: { nativeEvent: { data: string } }) => {
       try {
@@ -106,20 +103,19 @@ export function ArticleWebView({ html, articleTitle, onLinkPress }: Props) {
           onLinkPress(msg.title);
         }
       } catch {
-        // ignore
+        // ignore malformed messages
       }
     },
     [onLinkPress]
   );
 
   const handleNavigation = useCallback((request: WebViewNavigation) => {
-    // Allow blank, data URIs, and blob URLs (initial load on web)
     if (
       request.url === 'about:blank' ||
       request.url.startsWith('data:') ||
       request.url.startsWith('blob:')
     ) return true;
-    // Block everything else — wiki:// links are handled via onMessage
+    // All wiki navigation is handled by the JS click interceptor above
     return false;
   }, []);
 
@@ -129,7 +125,7 @@ export function ArticleWebView({ html, articleTitle, onLinkPress }: Props) {
         style={styles.webview}
         originWhitelist={['*']}
         source={{ html: FULL_HTML(html, articleTitle) }}
-        injectedJavaScript={INJECTED_JS}
+        injectedJavaScript={injectedJS}
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleNavigation}
         startInLoadingState={false}
@@ -142,12 +138,6 @@ export function ArticleWebView({ html, articleTitle, onLinkPress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
+  container: { flex: 1, backgroundColor: C.bg },
+  webview: { flex: 1, backgroundColor: C.bg },
 });
