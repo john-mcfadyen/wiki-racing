@@ -113,10 +113,14 @@ export function ArticleWebView({ html, articleTitle, onLinkPress }: Props) {
   );
 
   const handleNavigation = useCallback((request: WebViewNavigation) => {
-    if (request.url === 'about:blank') return true;
-    if (request.url.startsWith('wiki://')) return false;
-    // Allow initial data load
-    return request.url.startsWith('data:') || request.url === 'about:blank';
+    // Allow blank, data URIs, and blob URLs (initial load on web)
+    if (
+      request.url === 'about:blank' ||
+      request.url.startsWith('data:') ||
+      request.url.startsWith('blob:')
+    ) return true;
+    // Block everything else — wiki:// links are handled via onMessage
+    return false;
   }, []);
 
   return (

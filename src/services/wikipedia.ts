@@ -1,26 +1,32 @@
 import { WikiArticle } from '../types';
 
-const REST_API = 'https://en.wikipedia.org/api/rest_v1';
 const ACTION_API = 'https://en.wikipedia.org/w/api.php';
 
 export async function fetchArticleHtml(title: string): Promise<WikiArticle> {
-  const encodedTitle = encodeURIComponent(title.replace(/ /g, '_'));
-  const res = await fetch(`${REST_API}/page/mobile-sections/${encodedTitle}`);
+  // Use the Action API parse endpoint — it sends origin=* which enables CORS
+  // for browser/web environments. The REST API (rest_v1) mobile-sections endpoint
+  // does not include CORS headers, causing "Failed to fetch" on web.
+  const params = new URLSearchParams({
+    action: 'parse',
+    page: title,
+    prop: 'text',
+    format: 'json',
+    origin: '*',
+    disablelimitreport: '1',
+    disableeditsection: '1',
+  });
+
+  const res = await fetch(`${ACTION_API}?${params}`);
   if (!res.ok) throw new Error(`Wikipedia fetch failed: ${res.status}`);
   const data = await res.json();
 
-  const pageid: number = data.lead?.id ?? 0;
-  const pageTitle: string = data.lead?.normalizedtitle ?? title;
+  if (data.error) throw new Error(data.error.info ?? 'Wikipedia API error');
 
-  // Collect all sections' HTML
-  const leadHtml: string = data.lead?.sections?.[0]?.text ?? '';
-  const sectionHtmls: string[] = (data.remaining?.sections ?? []).map(
-    (s: { text?: string }) => s.text ?? ''
-  );
+  const pageid: number = data.parse?.pageid ?? 0;
+  const pageTitle: string = data.parse?.title ?? title;
+  const rawHtml: string = data.parse?.text?.['*'] ?? '';
 
-  const rawHtml = [leadHtml, ...sectionHtmls].join('');
   const strippedHtml = stripWikipediaHtml(rawHtml);
-
   return { pageid, title: pageTitle, html: strippedHtml };
 }
 
